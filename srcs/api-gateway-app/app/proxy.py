@@ -24,12 +24,27 @@ def gateway(path: str):
 
     if target_service:
         try:
+            forwarded_headers = {
+                key: value
+                for key, value in request.headers.items()
+                if key.lower() not in {
+                    "host",
+                    "content-length",
+                    "transfer-encoding",
+                    "connection",
+                    "keep-alive",
+                    "proxy-connection",
+                    "upgrade",
+                }
+            }
+
             response = requests.request(
                 method=request.method,
                 url=f"{target_service}/{path}",
-                headers=request.headers,
+                headers=forwarded_headers,
                 data=request.get_data(),
-                params=request.args
+                params=request.args,
+                timeout=10
             )
             return (
                 response.text,

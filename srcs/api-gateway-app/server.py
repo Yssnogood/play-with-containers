@@ -3,7 +3,7 @@ from waitress import serve
 
 import os
 
-APP_PORT = os.getenv("APP_PORT")
+APP_PORT = os.getenv("APP_PORT", "3000")
 
 app = create_app()
 serve(app, listen=f"*:{APP_PORT}")

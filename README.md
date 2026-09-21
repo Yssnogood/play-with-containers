@@ -1,76 +1,87 @@
-# crud-master
+# CRUD Master with Docker Compose
 
-Check more information about this project
-[here](https://github.com/01-edu/public/blob/master/subjects/devops/crud-master-py/README.md).
+This project packages the CRUD microservices into a Docker Compose environment with separate containers for the inventory service, billing service, PostgreSQL databases, RabbitMQ, and the API gateway.
 
-## Setup
+## Architecture
 
-In order to be able to run this application you need to have the following
-programs installed on your machine:
+The application is composed of the following services:
 
-- [Vagrant](https://developer.hashicorp.com/vagrant/docs/installation).
-- [VirtualBox](https://www.virtualbox.org/wiki/Downloads).
+- `inventory-db`: PostgreSQL database for inventory data
+- `billing-db`: PostgreSQL database for billing data
+- `inventory-app`: Flask API that manages movies
+- `billing-app`: Flask service that consumes orders from RabbitMQ and stores them in the billing database
+- `rabbit-queue`: RabbitMQ broker used for asynchronous billing messages
+- `api-gateway-app`: public entry point for the application on port `3000`
 
-To interact with the application, it is recommended to install the following
-programs, or any equivalent ones:
+All services are connected through a private Docker network, while only the API gateway is exposed to the host machine.
 
-- [Postman](https://www.postman.com/downloads/), or any other tool to
-  programmatically test API endpoints.
-- [DBeaver](https://dbeaver.io/download/), or any other tool to interact and
-  visualize the content of a SQL database.
+## Prerequisites
 
-To launch the application, follow the below instructions:
+Before running the project, install:
 
-- Create a `.env` file in the root of the project folder as the example
-  provided. You can simply `cp .env.example .env`
-- Install _vagrant-env_ plug in running: `vagrant plugin install vagrant-env`
-- Run the command `vagrant up` to create all the VMs - this might take a while
-  depending on the resources of your local machine.
-- Interact with the VM cluster using Postman, `curl` or any other tool of your
-  choice. It is possible to see the IP address of the API Gateway and the port
-  in the [`config.yaml`](./config.yaml) and [`.env`](./.env) files
+- Docker
+- Docker Compose
 
-To check if everything is working as expected:
+## Environment configuration
 
-- Check that all the VMs are running
+Copy the example environment file and adjust the credentials if needed:
 
-```console
-$ vagrant status
-Current machine states:
-
-BillingVM                 running (virtualbox)
-InventoryVM               running (virtualbox)
-GatewayVM                 running (virtualbox)
-
-This environment represents multiple VMs. The VMs are all listed
-above with their current state. For more information about a specific
-VM, run `vagrant status NAME`.
+```bash
+cp .env.example .env
 ```
 
-(you should see the same message or a similar one)
+The `.env` file is ignored by Git and contains the credentials used by PostgreSQL and RabbitMQ.
 
-- Check that your API Gateway is able to receive HTTP requests. For example,
-  you should be able to replicate a similar workflow (IP address and port must
-  be the ones defined in your configuration):
+## Build and run
 
-```console
-$ curl -X POST -H "Content-Type: application/json" \
-    -d '{"title": "movie", "description": "wonderful plot"}' \
-    192.168.56.30:3000/api/movies
-{"message":"movie movie inserted successfully"}
-$ curl -s 192.168.56.30:3000/api/movies | jq
-{
-  "movies": [
-    {
-      "description": "wonderful plot",
-      "id": 3,
-      "title": "movie"
-    }
-  ]
-}
-$ curl -X DELETE 192.168.56.30:3000/api/movies
-{"message":"all movies deleted successfully"}
-$ curl 192.168.56.30:3000/api/movies
-{"movies":[]}
-$
+From the project root, start the whole stack:
+
+```bash
+docker compose up --build -d
 ```
+
+To inspect logs:
+
+```bash
+docker compose logs -f
+```
+
+To stop the stack:
+
+```bash
+docker compose down -v
+```
+
+## Service access
+
+Once the stack is running:
+
+- API Gateway: `http://localhost:3000`
+- Inventory API: `http://inventory-app:8080`
+- Billing API: `http://billing-app:8080`
+- Inventory database: `inventory-db:5432`
+- Billing database: `billing-db:5432`
+- RabbitMQ: `rabbit-queue:5672`
+
+## Example requests
+
+Create a movie through the gateway:
+
+```bash
+curl -X POST http://localhost:3000/api/movies \
+  -H "Content-Type: application/json" \
+  -d '{"title":"movie","description":"wonderful plot"}'
+```
+
+List movies:
+
+```bash
+curl http://localhost:3000/api/movies
+```
+
+## Notes
+
+- The container images for the Python services are built from the project source using dedicated Dockerfiles.
+- Named volumes ensure that PostgreSQL data and gateway logs persist between container restarts.
+- The services restart automatically unless the containers are explicitly stopped.
+- The Docker Compose configuration uses service names instead of `localhost` so the apps can communicate correctly inside the internal network.

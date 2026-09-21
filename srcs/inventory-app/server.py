@@ -4,7 +4,7 @@ from app import create_app
 import os
 
 
-PORT = os.getenv("APP_PORT")
+PORT = os.getenv("APP_PORT", "8080")
 
 app = create_app()
 print(f"Listening on port {PORT}...")

@@ -1,0 +1,151 @@
+services:
+  inventory-db:
+    image: inventory-db
+    container_name: inventory-db
+    build:
+      context: ./srcs/inventory-db
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_DB: ${INVENTORY_DB_NAME}
+      POSTGRES_USER: ${INVENTORY_DB_USER}
+      POSTGRES_PASSWORD: ${INVENTORY_DB_PASSWORD}
+    volumes:
+      - inventory-db-data:/var/lib/postgresql/data
+    networks:
+      - crud-network
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${INVENTORY_DB_USER} -d ${INVENTORY_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    expose:
+      - "5432"
+
+  billing-db:
+    image: billing-db
+    container_name: billing-db
+    build:
+      context: ./srcs/billing-db
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_DB: ${BILLING_DB_NAME}
+      POSTGRES_USER: ${BILLING_DB_USER}
+      POSTGRES_PASSWORD: ${BILLING_DB_PASSWORD}
+    volumes:
+      - billing-db-data:/var/lib/postgresql/data
+    networks:
+      - crud-network
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BILLING_DB_USER} -d ${BILLING_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    expose:
+      - "5432"
+
+  rabbit-queue:
+    image: rabbit-queue
+    container_name: rabbit-queue
+    build:
+      context: ./srcs/rabbit-queue
+      dockerfile: Dockerfile
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    networks:
+      - crud-network
+    restart: on-failure
+    expose:
+      - "5672"
+
+  inventory-app:
+    image: inventory-app
+    container_name: inventory-app
+    build:
+      context: ./srcs/inventory-app
+      dockerfile: Dockerfile
+    environment:
+      APP_PORT: "8080"
+      INVENTORY_DB_HOST: ${INVENTORY_DB_HOST}
+      INVENTORY_DB_NAME: ${INVENTORY_DB_NAME}
+      INVENTORY_DB_USER: ${INVENTORY_DB_USER}
+      INVENTORY_DB_PASSWORD: ${INVENTORY_DB_PASSWORD}
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+    networks:
+      - crud-network
+    restart: on-failure
+    expose:
+      - "8080"
+
+  billing-app:
+    image: billing-app
+    container_name: billing-app
+    build:
+      context: ./srcs/billing-app
+      dockerfile: Dockerfile
+    environment:
+      APP_PORT: "8080"
+      BILLING_DB_HOST: ${BILLING_DB_HOST}
+      BILLING_DB_NAME: ${BILLING_DB_NAME}
+      BILLING_DB_USER: ${BILLING_DB_USER}
+      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE}
+    depends_on:
+      billing-db:
+        condition: service_healthy
+      rabbit-queue:
+        condition: service_started
+    networks:
+      - crud-network
+    restart: on-failure
+    expose:
+      - "8080"
+
+  api-gateway-app:
+    image: api-gateway-app
+    container_name: api-gateway-app
+    build:
+      context: ./srcs/api-gateway-app
+      dockerfile: Dockerfile
+    environment:
+      APP_PORT: "3000"
+      INVENTORY_APP_HOST: ${INVENTORY_APP_HOST}
+      INVENTORY_APP_PORT: ${INVENTORY_APP_PORT}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE}
+    depends_on:
+      inventory-app:
+        condition: service_started
+      billing-app:
+        condition: service_started
+      rabbit-queue:
+        condition: service_started
+    networks:
+      - crud-network
+    ports:
+      - "3000:3000"
+    volumes:
+      - api-gateway-logs:/var/log/api-gateway-app
+    restart: on-failure
+    command: >
+      sh -c "mkdir -p /var/log/api-gateway-app && python server.py 2>&1 | tee /var/log/api-gateway-app/gateway.log"
+
+networks:
+  crud-network:
+    driver: bridge
+
+volumes:
+  inventory-db-data:
+  billing-db-data:
+  api-gateway-logs:
