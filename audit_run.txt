@@ -1,0 +1,665 @@
+=== Docker microservices audit battery ===
+This script answers the audit questions and verifies the live project behavior.
+
+=== Start the project and validate the compose stack ===
+name: crud-master-py
+services:
+  api-gateway-app:
+    build:
+      context: C:\Users\antoi\Desktop\Travail\Master\crud\crud-master-py\srcs\api-gateway-app
+      dockerfile: Dockerfile
+    command:
+      - sh
+      - -c
+      - mkdir -p /var/log/api-gateway-app && python server.py 2>&1 | tee /var/log/api-gateway-app/gateway.log
+    container_name: api-gateway-app
+    depends_on:
+      billing-app:
+        condition: service_started
+        required: true
+      inventory-app:
+        condition: service_started
+        required: true
+      rabbit-queue:
+        condition: service_started
+        required: true
+    environment:
+      APP_PORT: "3000"
+      INVENTORY_APP_HOST: inventory-app
+      INVENTORY_APP_PORT: "8080"
+      RABBITMQ_HOST: rabbit-queue
+      RABBITMQ_PASSWORD: password
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_QUEUE: billing_queue
+      RABBITMQ_USER: rabbit
+    image: api-gateway-app
+    networks:
+      crud-network: null
+    ports:
+      - mode: ingress
+        target: 3000
+        published: "3000"
+        protocol: tcp
+    restart: on-failure
+    volumes:
+      - type: volume
+        source: api-gateway-logs
+        target: /var/log/api-gateway-app
+        volume: {}
+  billing-app:
+    build:
+      context: C:\Users\antoi\Desktop\Travail\Master\crud\crud-master-py\srcs\billing-app
+      dockerfile: Dockerfile
+    container_name: billing-app
+    depends_on:
+      billing-db:
+        condition: service_healthy
+        required: true
+      rabbit-queue:
+        condition: service_started
+        required: true
+    environment:
+      APP_PORT: "8080"
+      BILLING_DB_HOST: billing-db
+      BILLING_DB_NAME: billing_db
+      BILLING_DB_PASSWORD: billing_password
+      BILLING_DB_USER: billing_user
+      RABBITMQ_HOST: rabbit-queue
+      RABBITMQ_PASSWORD: password
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_QUEUE: billing_queue
+      RABBITMQ_USER: rabbit
+    expose:
+      - "8080"
+    image: billing-app
+    networks:
+      crud-network: null
+    restart: on-failure
+  billing-db:
+    build:
+      context: C:\Users\antoi\Desktop\Travail\Master\crud\crud-master-py\srcs\billing-db
+      dockerfile: Dockerfile
+    container_name: billing-db
+    environment:
+      POSTGRES_DB: billing_db
+      POSTGRES_PASSWORD: billing_password
+      POSTGRES_USER: billing_user
+    expose:
+      - "5432"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U billing_user -d billing_db
+      timeout: 5s
+      interval: 10s
+      retries: 5
+    image: billing-db
+    networks:
+      crud-network: null
+    restart: on-failure
+    volumes:
+      - type: volume
+        source: billing-db-data
+        target: /var/lib/postgresql/data
+        volume: {}
+  inventory-app:
+    build:
+      context: C:\Users\antoi\Desktop\Travail\Master\crud\crud-master-py\srcs\inventory-app
+      dockerfile: Dockerfile
+    container_name: inventory-app
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+        required: true
+    environment:
+      APP_PORT: "8080"
+      INVENTORY_DB_HOST: inventory-db
+      INVENTORY_DB_NAME: inventory_db
+      INVENTORY_DB_PASSWORD: inventory_password
+      INVENTORY_DB_USER: inventory_user
+    expose:
+      - "8080"
+    image: inventory-app
+    networks:
+      crud-network: null
+    restart: on-failure
+  inventory-db:
+    build:
+      context: C:\Users\antoi\Desktop\Travail\Master\crud\crud-master-py\srcs\inventory-db
+      dockerfile: Dockerfile
+    container_name: inventory-db
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_PASSWORD: inventory_password
+      POSTGRES_USER: inventory_user
+    expose:
+      - "5432"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U inventory_user -d inventory_db
+      timeout: 5s
+      interval: 10s
+      retries: 5
+    image: inventory-db
+    networks:
+      crud-network: null
+    restart: on-failure
+    volumes:
+      - type: volume
+        source: inventory-db-data
+        target: /var/lib/postgresql/data
+        volume: {}
+  rabbit-queue:
+    build:
+      context: C:\Users\antoi\Desktop\Travail\Master\crud\crud-master-py\srcs\rabbit-queue
+      dockerfile: Dockerfile
+    container_name: rabbit-queue
+    environment:
+      RABBITMQ_DEFAULT_PASS: password
+      RABBITMQ_DEFAULT_USER: rabbit
+    expose:
+      - "5672"
+    image: rabbit-queue
+    networks:
+      crud-network: null
+    restart: on-failure
+networks:
+  crud-network:
+    name: crud-master-py_crud-network
+    driver: bridge
+volumes:
+  api-gateway-logs:
+    name: crud-master-py_api-gateway-logs
+  billing-db-data:
+    name: crud-master-py_billing-db-data
+  inventory-db-data:
+    name: crud-master-py_inventory-db-data
+2026/09/22 12:31:29 http2: server: error reading preface from client //./pipe/docker_engine: file has already been closed
+2026/09/22 12:31:29 http2: server: error reading preface from client //./pipe/docker_engine: file has already been closed
+#0 building with "default" instance using docker driver
+
+#1 [billing-db internal] load build definition from Dockerfile
+#1 transferring dockerfile: 77B 0.0s done
+#1 DONE 0.0s
+
+#2 [rabbit-queue internal] load build definition from Dockerfile
+#2 transferring dockerfile: 96B done
+#2 DONE 0.0s
+
+#3 [inventory-db internal] load build definition from Dockerfile
+#3 transferring dockerfile: 77B done
+#3 DONE 0.0s
+
+#4 [rabbit-queue internal] load metadata for docker.io/library/rabbitmq:3.13-management-alpine
+#4 DONE 0.5s
+
+#5 [inventory-db internal] load .dockerignore
+#5 transferring context: 2B 0.0s done
+#5 DONE 0.0s
+
+#6 [inventory-db internal] load metadata for docker.io/library/postgres:16-alpine
+#6 DONE 0.5s
+
+#7 [rabbit-queue internal] load .dockerignore
+#7 transferring context: 2B 0.0s done
+#7 DONE 0.0s
+
+#8 [inventory-db] exporting to image
+#8 exporting layers done
+#8 writing image sha256:6671318fc728598c9c4410f947a6f60f7e4969e573ac9642107d6b52ef31f3be 0.0s done
+#8 naming to docker.io/library/inventory-db done
+#8 DONE 0.0s
+
+#9 [billing-db internal] load .dockerignore
+#9 transferring context: 2B 0.0s done
+#9 DONE 0.0s
+
+#10 [rabbit-queue 1/1] FROM docker.io/library/rabbitmq:3.13-management-alpine@sha256:606d8c0d6b3c18d1da9afc53bc7cdb2a8d5486df91b5a9830e9e07626c9ae281
+#10 CACHED
+
+#11 [billing-db 1/1] FROM docker.io/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+#11 CACHED
+
+#12 [rabbit-queue] exporting to image
+#12 exporting layers done
+#12 writing image sha256:3248923f478305949507ebf6bd408a25387f0d132011a1a759cd627e019a9ea5 0.0s done
+#12 naming to docker.io/library/rabbit-queue
+#12 naming to docker.io/library/rabbit-queue 0.0s done
+#12 DONE 0.2s
+
+#13 [billing-db] exporting to image
+#13 exporting layers done
+#13 writing image sha256:012b345aa62642cfdc037772a40318cb00c2ced2182c789652b5f918b7736805 0.0s done
+#13 naming to docker.io/library/billing-db 0.0s done
+#13 DONE 0.2s
+2026/09/22 12:31:31 http2: server: error reading preface from client //./pipe/docker_engine: file has already been closed
+
+#14 [inventory-app internal] load build definition from Dockerfile
+#14 transferring dockerfile: 210B done
+#14 DONE 0.0s
+
+#15 [billing-app internal] load build definition from Dockerfile
+#15 transferring dockerfile: 217B done
+#15 DONE 0.0s
+
+#16 [billing-app internal] load metadata for docker.io/library/python:3.12-alpine
+#16 DONE 0.5s
+
+#17 [inventory-app internal] load .dockerignore
+#17 transferring context: 2B done
+#17 DONE 0.0s
+
+#18 [billing-app internal] load .dockerignore
+#18 transferring context: 2B done
+#18 DONE 0.0s
+
+#19 [inventory-app internal] load build context
+#19 transferring context: 14.10kB done
+#19 DONE 0.0s
+
+#20 [inventory-app 4/5] RUN pip install --no-cache-dir -r requirements.txt
+#20 CACHED
+
+#21 [inventory-app 3/5] COPY requirements.txt ./
+#21 CACHED
+
+#22 [inventory-app 5/5] COPY . .
+#22 CACHED
+
+#23 [billing-app 1/5] FROM docker.io/library/python:3.12-alpine@sha256:4c47124a8391cb7a9f571164147d154777cf012a4ece5f86097130d7a4478111
+#23 resolve docker.io/library/python:3.12-alpine@sha256:4c47124a8391cb7a9f571164147d154777cf012a4ece5f86097130d7a4478111 0.0s done
+#23 DONE 0.0s
+
+#24 [billing-app internal] load build context
+#24 transferring context: 10.83kB 0.0s done
+#24 DONE 0.0s
+
+#25 [billing-app 4/5] RUN pip install --no-cache-dir -r requirements.txt
+#25 CACHED
+
+#26 [inventory-app 2/5] WORKDIR /usr/src/
+#26 CACHED
+
+#27 [billing-app 3/5] COPY requirements.txt ./
+#27 CACHED
+
+#28 [billing-app 5/5] COPY . .
+#28 CACHED
+
+#29 [inventory-app] exporting to image
+#29 exporting layers done
+#29 writing image sha256:fd9453cbb400640c80e7d051938f79e21357986e48f482935dec8884f2b1fa6c done
+#29 naming to docker.io/library/inventory-app done
+#29 DONE 0.0s
+
+#30 [billing-app] exporting to image
+#30 exporting layers done
+#30 writing image sha256:6a698c50b6288f9e79d8e701feaba167be5543ece57486ff005ca473d2f65e04 done
+#30 naming to docker.io/library/billing-app done
+#30 DONE 0.0s
+2026/09/22 12:31:32 http2: server: error reading preface from client //./pipe/docker_engine: file has already been closed
+
+#31 [api-gateway-app internal] load build definition from Dockerfile
+#31 transferring dockerfile: 210B 37.5s done
+#31 DONE 37.5s
+
+#16 [api-gateway-app internal] load metadata for docker.io/library/python:3.12-alpine
+#16 DONE -36.7s
+
+#32 [api-gateway-app internal] load .dockerignore
+#32 transferring context: 2B done
+#32 DONE 0.0s
+
+#23 [api-gateway-app 1/5] FROM docker.io/library/python:3.12-alpine@sha256:4c47124a8391cb7a9f571164147d154777cf012a4ece5f86097130d7a4478111
+#23 resolve docker.io/library/python:3.12-alpine@sha256:4c47124a8391cb7a9f571164147d154777cf012a4ece5f86097130d7a4478111 0.0s done
+#23 DONE 0.0s
+
+#33 [api-gateway-app internal] load build context
+#33 transferring context: 10.18kB done
+#33 DONE 0.0s
+
+#34 [api-gateway-app 3/5] COPY requirements.txt ./
+#34 CACHED
+
+#26 [api-gateway-app 2/5] WORKDIR /usr/src/
+#26 CACHED
+
+#35 [api-gateway-app 4/5] RUN pip install --no-cache-dir -r requirements.txt
+#35 CACHED
+
+#36 [api-gateway-app 5/5] COPY . .
+#36 CACHED
+
+#37 [api-gateway-app] exporting to image
+#37 exporting layers done
+#37 writing image sha256:e68b0424a916d65fd332d23022972717d32ac0f6b6093b7d775454f7dee5fdb6 done
+#37 naming to docker.io/library/api-gateway-app done
+#37 DONE 0.0s
+ Container rabbit-queue  Running
+ Container inventory-db  Running
+ Container billing-db  Running
+ Container inventory-app  Running
+ Container billing-app  Running
+ Container api-gateway-app  Running
+ Container inventory-db  Waiting
+ Container billing-db  Waiting
+ Container inventory-db  Healthy
+ Container billing-db  Healthy
+ Container billing-db  Waiting
+ Container rabbit-queue  Waiting
+ Container inventory-app  Waiting
+ Container billing-app  Waiting
+ Container api-gateway-app  Waiting
+ Container inventory-db  Waiting
+ Container billing-db  Healthy
+ Container api-gateway-app  Healthy
+ Container rabbit-queue  Healthy
+ Container billing-app  Healthy
+ Container inventory-app  Healthy
+ Container inventory-db  Healthy
+NAME              IMAGE             COMMAND                  SERVICE           CREATED          STATUS                    PORTS
+api-gateway-app   api-gateway-app   "sh -c 'mkdir -p /va…"   api-gateway-app   23 minutes ago   Up 22 minutes             0.0.0.0:3000->3000/tcp
+billing-app       billing-app       "python server.py"       billing-app       23 minutes ago   Up 16 minutes             8080/tcp
+billing-db        billing-db        "docker-entrypoint.s…"   billing-db        26 hours ago     Up 29 minutes (healthy)   5432/tcp
+inventory-app     inventory-app     "python server.py"       inventory-app     26 hours ago     Up 29 minutes             8080/tcp
+inventory-db      inventory-db      "docker-entrypoint.s…"   inventory-db      26 hours ago     Up 29 minutes (healthy)   5432/tcp
+rabbit-queue      rabbit-queue      "docker-entrypoint.s…"   rabbit-queue      26 hours ago     Up 29 minutes             4369/tcp, 5671-5672/tcp, 15671-15672/tcp, 15691-15692/tcp, 25672/tcp
+
+Q1 - What is a container?
+Answer: Each service runs in its own isolated container, and Docker shares the host kernel instead of running a full virtual OS.
+PASS Q1: containerized services are present.
+
+Q2 - What are the advantages of containers?
+Answer: Containers improve consistency, isolation, speed, portability, and simpler deployment with Docker Compose.
+PASS Q2: isolated service stack is configured.
+
+Q3 - What is the difference between a container and a VM?
+Answer: A container is lighter and shares the host kernel, while a VM includes a full guest OS and more overhead.
+PASS Q3: container runtime is active.
+
+Q4 - What is Docker?
+Answer: Docker is the platform used to build, ship, and run containers from images.
+PASS Q4: compose configuration is valid.
+
+Q5 - What is Docker used for?
+Answer: Docker is used to package and run the application services in a reproducible environment.
+PASS Q5: Docker is actively running the stack.
+
+Q6 - What is a microservice architecture?
+Answer: This app splits responsibilities between inventory, billing, queue, databases, and the API gateway.
+PASS Q6: microservice structure is present.
+
+Q7 - Why do we use microservices?
+Answer: They isolate concerns, simplify scaling by component, and reduce coupling between services.
+PASS Q7: microservice services are independent and active.
+
+Q8 - What is a queue?
+Answer: A queue stores requests until a consumer processes them, decoupling the API from the billing job.
+PASS Q8: RabbitMQ queue broker is available.
+
+Q9 - What is RabbitMQ?
+Answer: RabbitMQ is the message broker used to transport billing messages between producer and consumer.
+PASS Q9: billing queue is present.
+
+Q10 - What is a Dockerfile?
+Answer: A Dockerfile defines how a service image is built and configured.
+PASS Q10: every service has a Dockerfile.
+
+Q11 - What are the main Dockerfile instructions?
+Answer: FROM, WORKDIR, COPY, RUN, and the runtime command are used to build the Python services.
+PASS Q11: the core Dockerfile instructions are present.
+
+Q12 - What is a Docker volume?
+Answer: Named volumes persist database state and logs beyond the lifetime of a single container.
+PASS Q12: required volumes exist.
+
+Q13 - Why do we use Docker volumes?
+Answer: We use volumes to preserve PostgreSQL data and avoid losing state during restarts or rebuilds.
+PASS Q13: volume persistence is configured.
+
+Q14 - What is a Docker network?
+Answer: Docker networks allow containers to discover each other by service name inside the private stack network.
+PASS Q14: the internal bridge network exists.
+
+Q15 - Why do we use a Docker network?
+Answer: The network keeps internal communication private and reduces the number of public ports exposed to the host.
+PASS Q15: application services are attached to the private network.
+
+Q16 - What is a Docker image?
+Answer: A Docker image is the read-only template from which a container is created.
+PASS Q16: image definitions are present for the services.
+
+Q17 - Why do we use Docker images?
+Answer: Images make the app build reproducible and allow the same environment to run everywhere.
+PASS Q17: build configs are included for all services.
+
+Q18 - Why is restart: on-failure important?
+Answer: It automatically restarts containers after a crash so the service stays available.
+on-failure
+on-failure
+PASS Q18: restart policy is configured.
+
+Q19 - Why should sensitive data not be pushed to Git?
+Answer: The project keeps real credentials in the local .env file and documents them via .env.example instead of committing secrets.
+PASS Q19: secrets are excluded and an example file is present.
+
+Q20 - Why do we use environment variables?
+Answer: Environment variables hold database, broker, and app settings without hardcoding secrets in source files.
+PASS Q20: configuration variables are defined.
+
+Q21 - Why do we expose only the gateway port?
+Answer: Only the gateway is published to the host; the database and app services remain private inside the Docker network.
+PASS Q21: gateway is the public entry point while app services stay internal.
+
+Q22 - Summary of the project
+Answer: The stack is a Dockerized microservices application with gateway, databases, RabbitMQ, and verified runtime behavior.
+2026/09/22 12:31:44 http2: server: error reading preface from client //./pipe/docker_engine: file has already been closed
+2026/09/22 12:31:44 http2: server: error reading preface from client //./pipe/docker_engine: file has already been closed
+2026/09/22 12:31:45 http2: server: error reading preface from client //./pipe/docker_engine: file has already been closed
+#0 building with "default" instance using docker driver
+
+#1 [billing-db internal] load build definition from Dockerfile
+#1 transferring dockerfile: 77B done
+#1 DONE 0.0s
+
+#2 [inventory-db internal] load build definition from Dockerfile
+#2 transferring dockerfile: 77B done
+#2 DONE 0.0s
+
+#3 [rabbit-queue internal] load build definition from Dockerfile
+#3 transferring dockerfile: 96B done
+#3 DONE 0.0s
+
+#4 [inventory-db internal] load metadata for docker.io/library/postgres:16-alpine
+#4 DONE 0.3s
+
+#5 [inventory-db internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [billing-db internal] load .dockerignore
+#6 transferring context: 2B done
+#6 DONE 0.0s
+
+#7 [billing-db 1/1] FROM docker.io/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+#7 CACHED
+
+#8 [billing-db] exporting to image
+#8 exporting layers done
+#8 writing image sha256:012b345aa62642cfdc037772a40318cb00c2ced2182c789652b5f918b7736805 done
+#8 naming to docker.io/library/billing-db done
+#8 DONE 0.0s
+
+#9 [inventory-db] exporting to image
+#9 exporting layers done
+#9 writing image sha256:6671318fc728598c9c4410f947a6f60f7e4969e573ac9642107d6b52ef31f3be done
+#9 naming to docker.io/library/inventory-db done
+#9 DONE 0.0s
+
+#10 [rabbit-queue internal] load metadata for docker.io/library/rabbitmq:3.13-management-alpine
+#10 DONE 0.4s
+2026/09/22 12:31:46 http2: server: error reading preface from client //./pipe/docker_engine: file has already been closed
+
+#11 [rabbit-queue internal] load .dockerignore
+#11 transferring context: 2B done
+#11 DONE 0.0s
+
+#12 [rabbit-queue 1/1] FROM docker.io/library/rabbitmq:3.13-management-alpine@sha256:606d8c0d6b3c18d1da9afc53bc7cdb2a8d5486df91b5a9830e9e07626c9ae281
+#12 CACHED
+
+#13 [rabbit-queue] exporting to image
+#13 exporting layers done
+#13 writing image sha256:3248923f478305949507ebf6bd408a25387f0d132011a1a759cd627e019a9ea5 done
+#13 naming to docker.io/library/rabbit-queue done
+#13 DONE 0.0s
+2026/09/22 12:31:46 http2: server: error reading preface from client //./pipe/docker_engine: file has already been closed
+
+#14 [inventory-app internal] load build definition from Dockerfile
+#14 transferring dockerfile: 210B done
+#14 DONE 0.0s
+
+#15 [billing-app internal] load build definition from Dockerfile
+#15 transferring dockerfile: 217B done
+#15 DONE 0.0s
+
+#16 [billing-app internal] load metadata for docker.io/library/python:3.12-alpine
+#16 DONE 0.3s
+
+#17 [billing-app internal] load .dockerignore
+#17 transferring context: 2B done
+#17 DONE 0.0s
+
+#18 [inventory-app internal] load .dockerignore
+#18 transferring context: 2B done
+#18 DONE 0.0s
+
+#19 [billing-app internal] load build context
+#19 transferring context: 10.83kB done
+#19 DONE 0.0s
+
+#20 [inventory-app 1/5] FROM docker.io/library/python:3.12-alpine@sha256:4c47124a8391cb7a9f571164147d154777cf012a4ece5f86097130d7a4478111
+#20 resolve docker.io/library/python:3.12-alpine@sha256:4c47124a8391cb7a9f571164147d154777cf012a4ece5f86097130d7a4478111 0.0s done
+#20 DONE 0.0s
+
+#21 [inventory-app internal] load build context
+#21 transferring context: 524B done
+#21 DONE 0.0s
+
+#22 [inventory-app 4/5] RUN pip install --no-cache-dir -r requirements.txt
+#22 CACHED
+
+#23 [inventory-app 3/5] COPY requirements.txt ./
+#23 CACHED
+
+#24 [inventory-app 5/5] COPY . .
+#24 CACHED
+
+#25 [billing-app 3/5] COPY requirements.txt ./
+#25 CACHED
+
+#26 [billing-app 4/5] RUN pip install --no-cache-dir -r requirements.txt
+#26 CACHED
+
+#27 [billing-app 2/5] WORKDIR /usr/src/
+#27 CACHED
+
+#28 [billing-app 5/5] COPY . .
+#28 CACHED
+
+#29 [inventory-app] exporting to image
+#29 exporting layers done
+#29 writing image sha256:fd9453cbb400640c80e7d051938f79e21357986e48f482935dec8884f2b1fa6c done
+#29 naming to docker.io/library/inventory-app done
+#29 DONE 0.0s
+
+#30 [billing-app] exporting to image
+#30 exporting layers done
+#30 writing image sha256:6a698c50b6288f9e79d8e701feaba167be5543ece57486ff005ca473d2f65e04 done
+#30 naming to docker.io/library/billing-app done
+#30 DONE 0.0s
+2026/09/22 12:31:46 http2: server: error reading preface from client //./pipe/docker_engine: file has already been closed
+2026/09/22 12:31:47 http2: server: error reading preface from client //./pipe/docker_engine: file has already been closed
+
+#31 [api-gateway-app internal] load build definition from Dockerfile
+#31 transferring dockerfile: 210B done
+#31 DONE 0.0s
+
+#16 [api-gateway-app internal] load metadata for docker.io/library/python:3.12-alpine
+#16 DONE 0.6s
+
+#32 [api-gateway-app internal] load .dockerignore
+#32 transferring context: 2B done
+#32 DONE 0.0s
+
+#20 [api-gateway-app 1/5] FROM docker.io/library/python:3.12-alpine@sha256:4c47124a8391cb7a9f571164147d154777cf012a4ece5f86097130d7a4478111
+#20 resolve docker.io/library/python:3.12-alpine@sha256:4c47124a8391cb7a9f571164147d154777cf012a4ece5f86097130d7a4478111 0.0s done
+#20 DONE 0.0s
+
+#33 [api-gateway-app internal] load build context
+#33 transferring context: 10.18kB 0.0s done
+#33 DONE 0.0s
+
+#27 [api-gateway-app 2/5] WORKDIR /usr/src/
+#27 CACHED
+
+#34 [api-gateway-app 3/5] COPY requirements.txt ./
+#34 CACHED
+
+#35 [api-gateway-app 4/5] RUN pip install --no-cache-dir -r requirements.txt
+#35 CACHED
+
+#36 [api-gateway-app 5/5] COPY . .
+#36 CACHED
+
+#37 [api-gateway-app] exporting to image
+#37 exporting layers done
+#37 writing image sha256:e68b0424a916d65fd332d23022972717d32ac0f6b6093b7d775454f7dee5fdb6 done
+#37 naming to docker.io/library/api-gateway-app done
+#37 DONE 0.0s
+ Container rabbit-queue  Running
+ Container inventory-db  Running
+ Container inventory-app  Running
+ Container billing-db  Running
+ Container billing-app  Running
+ Container api-gateway-app  Running
+ Container billing-db  Waiting
+ Container inventory-db  Waiting
+ Container billing-db  Healthy
+ Container inventory-db  Healthy
+ Container rabbit-queue  Waiting
+ Container inventory-app  Waiting
+ Container billing-app  Waiting
+ Container api-gateway-app  Waiting
+ Container inventory-db  Waiting
+ Container billing-db  Waiting
+ Container billing-app  Healthy
+ Container rabbit-queue  Healthy
+ Container api-gateway-app  Healthy
+ Container billing-db  Healthy
+ Container inventory-app  Healthy
+ Container inventory-db  Healthy
+PASS Q22: the complete stack and runtime flow are verified.
+
+=== Additional runtime checks ===
+NAME              IMAGE             COMMAND                  SERVICE           CREATED          STATUS                    PORTS
+api-gateway-app   api-gateway-app   "sh -c 'mkdir -p /va…"   api-gateway-app   23 minutes ago   Up 22 minutes             0.0.0.0:3000->3000/tcp
+billing-app       billing-app       "python server.py"       billing-app       23 minutes ago   Up 16 minutes             8080/tcp
+billing-db        billing-db        "docker-entrypoint.s…"   billing-db        26 hours ago     Up 30 minutes (healthy)   5432/tcp
+inventory-app     inventory-app     "python server.py"       inventory-app     26 hours ago     Up 30 minutes             8080/tcp
+inventory-db      inventory-db      "docker-entrypoint.s…"   inventory-db      26 hours ago     Up 30 minutes (healthy)   5432/tcp
+rabbit-queue      rabbit-queue      "docker-entrypoint.s…"   rabbit-queue      26 hours ago     Up 30 minutes             4369/tcp, 5671-5672/tcp, 15671-15672/tcp, 15691-15692/tcp, 25672/tcp
+
+=== Final validation of the Docker stack ===
+/inventory-db {"Name":"on-failure","MaximumRetryCount":0}
+/billing-db {"Name":"on-failure","MaximumRetryCount":0}
+/inventory-app {"Name":"on-failure","MaximumRetryCount":0}
+/billing-app {"Name":"on-failure","MaximumRetryCount":0}
+/rabbit-queue {"Name":"on-failure","MaximumRetryCount":0}
+/api-gateway-app {"Name":"on-failure","MaximumRetryCount":0}
+Timeout: 60.0 seconds ...
+Listing queues for vhost / ...
+name	messages
+billing_queue	0
+
+Audit battery succeeded: all checks passed and all runtime results were verified.
